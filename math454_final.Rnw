@@ -1,0 +1,520 @@
+% File SDSS2020_SampleExtendedAbstract.tex
+\documentclass[10pt]{article}
+\usepackage[margin = 1in]{geometry}
+
+%\usepackage{sdss2020} % Uses Times Roman font (either newtx or times package)
+\usepackage{url}
+\usepackage{latexsym}
+\usepackage{amsmath, amsthm, amsfonts}
+\usepackage{algorithm, algorithmic}  
+\usepackage{graphicx,setspace}
+\usepackage{natbib}
+\usepackage{indentfirst}
+\setlength{\parskip}{8pt}
+
+\title{Predicting Breast Cancer Type}
+
+\author{
+  Jennifer Nguyen\\
+  {\tt tnguyendoha@colgate.edu}}
+  
+\date{}
+
+\begin{document}
+\SweaveOpts{concordance=TRUE}
+\maketitle
+
+\section{Introduction}
+
+The dataset brca\_train contains 398 observations of fine needle aspirate (FNA) biopsy slides of breast masses. The response variable \textbf{outcome} is a categorical variable representing wheter the biopsy is benign (B) or malignant (M). For each biopsy/ observation, there is a total of 30 predictors, representing the \textbf{mean}, \textbf{standard error}, and \textbf{worst value} of 10 nuclear measurements. These nuclear measurements include: Radius, Textture, Perimeter, Area, Smoothness, Compactness, Concavity, Concave points, Symmetry, Fractal dimension. This is the dataset we will be fitting our classification models on.
+
+The dataset brca\_test includes measurements for all 30 predictors across 171 observations, with the response variable included. We will be using our final model to predict the outcome for the 171 observations in this test set, and we will compare this with the actual reported outcomes to compute our test accuracy.
+
+Our primary objective is to build a classification model that accurately predicts the outcome (benign/malignant) using brca\_train and subsequently apply the final model to brca\_train to classify the remaining 171 observations and report our test accuracy. Furthermore, we aim to identify significant predictors of malignant breast cancer to help inform oncologists. 
+
+Given that the response variable is a binary variable and all predictors are continuous variables, we will consider using the Logistic Regression, Random Forest, Support Vector Machine (SVM) and Gradient Boosting.
+
+The rest of this paper will be organized into 4 parts. Part II will present the mathematics of the our methods, part III will present our modeling results, and part IV will discuss our results. An appendix including our R code will also be provided at the end of the paper.
+
+<<echo=FALSE>>=
+library(tidyverse)
+library(caret)
+library(e1071)
+library(randomForest)
+library(glmnet)
+library(ggplot2)
+library(gridExtra)
+library(pROC)
+@
+
+\section{Methods}
+
+\subsection{Logistic Regression}
+Logistic regression is a model used for binary classification, it predicts the probability that an observation belongs to one of two classes. The logistic regression model assumes that
+\begin{equation}
+Y_1, Y_2, ..., Y_n \mathop{\sim}_{\text{ind}} Bernoulli(p_i) ,
+\end{equation}
+where
+\begin{equation}
+p_i=\frac{e^{\beta_0+\sum_{i=1}^{p}\beta_i x_i}}{1+e^{\beta_0+\beta_i x_i}}
+\end{equation}
+The summation from i=1 to p is used to account for all the predictors in the logistic regression model. Each predictor $x_i$ is multiplied by its corresponding coefficient $\beta_i$, and their sum (along with the intercept) is used in the logistic function to compute the predicted probability of each observed outcome being of class 1.
+
+\subsection{Random Forest}
+Random Forest is an ensemble learning method that uses multiple decision trees for classification or regression. Each decision tree is trained on a different bootstrap sample from the original dataset, and the model combines the predictions of each individual tree to make the final prediction. 
+
+In the case of classification, the final prediction is made using a majority vote across all trees. 
+The random forest model is:
+\begin{equation}
+\hat{Y} = mode \left\{T_1(X), T_2(X), \ldots, T_{B}(X)\right\},
+\end{equation}
+where $\hat{Y}$ is the predicted value (in this case, the predicted class label), and X is the vector of predictors $[x_1, x_2, \ldots, x_p]$. 
+
+$T_b(X)$ is the prediction class label by the b-th decision tree, and B is the total number of trees in the forest.$T_b(X)$ is the prediction class label by the $b$-th decision tree, and $B$ is the total number of trees in the forest.
+
+In the case of regression, the final prediction is made by averaging the predictions across all trees:
+\begin{equation}
+\hat{Y} = \frac{1}{B} \sum_{b=1}^{B} T_b(X),
+\end{equation}
+where $\hat{Y}$ is the predicted value (in this case, the predicted numerical target), $X$ is the vector of predictors $[x_1, x_2, \ldots, x_p]$, and $T_b(X)$ is the prediction by the $b$-th decision tree.
+
+\subsection{Support Vector Machine (SVM)}
+A Support Vector Machine (SVM) is a supervised learning model used for classification and regression tasks. It constructs a hyperplane or set of hyperplanes in a high-dimensional space to separate different classes. In this work, we use a classification SVM with a Radial Basis Function (RBF) kernel. The SVM model assumes that:
+\begin{equation}
+Y_i = \text{sign} \left\{\mathbf{w}^\top \mathbf{x}_i + b \right\},
+\end{equation}
+where$Y_i$ is the predicted class label for observation $i$ (either -1 or +1). $\mathbf{x}_i$ is the feature vector for observation $i$. $\mathbf{w}$ is the vector of weights, and $b$ is the bias term.
+
+In this work, we use a Radial Basis Function (RBF) kernel to handle non-linear classification:
+\begin{equation}
+K(\mathbf{x}_i, \mathbf{x}_j) = \exp(-\gamma |\mathbf{x}_i - \mathbf{x}_j|^2),
+\end{equation}
+where $\mathbf{x}_i$ and $\mathbf{x}_j$ are feature vectors,
+$\gamma$ is a hyperparameter controlling the influence of individual data points.
+
+\subsection{Variable Correlation}
+For two variables X and Y, the correlation coefficient is calculated using:
+\begin{equation}
+r_{X, Y} = \frac{\text{Cov}(X, Y)}{\sigma_X \sigma_Y},
+\end{equation}
+where Cov(X,Y) is the covariance between X and Y. $\sigma_X$ and $\sigma_Y$ are the standard deviations of X and Y respectively. 
+
+The covariance is defined as
+\begin{equation}
+\text{Cov}(X, Y) = \frac{1}{N-1} \sum_{i=1}^{N} (X_i - \bar{X})(Y_i - \bar{Y}),
+\end{equation}
+where N is the number of data points. $\bar{X}$ and $\bar{Y}$ are the means of X and Y.
+
+\subsection{Cross-Validation (CV) for model comparison}
+For each model, we divide the observations in the training data into k=5 folds of approximately equal size. We will treat the first fold as the testing set, and the remaining 4 folds as the training set. After fitting the model on the training set, we will use this fitted model to predict on the testing set and compute the prediction accuracy. After repeating the above process k=5 times, we compute the 5-fold CV estimate by averaging the prediction accuracy. Finally, we will use these CV estimates to compare the models. Generally, we choose the model with the highest predictive accuracy, but since our goal is both accuracy and interpretability, we need to balance the two. We will choose the model with the highest accuracy among the interpretable models.  
+
+
+\section{Results}
+
+\subsubsection{Description of the data set}
+
+\textbf{Figure 1} offers a overview of the data's statistical properties, representing the distribution of each predictor. Some distributions stand out as being roughly symmetrically distributed, including texture\_mean, smoothness\_mean, symmetry\_mean, texture\_worst, and smoothness\_worst. However, most variables appear to be right-skewed, and notably, the most heavily right-skewed distributions tend to be those related to standard error (SE). 
+
+<<echo=FALSE, fig=TRUE, width=8, height=6, warning=FALSE>>=
+bc_data <- read.csv('brca_train.csv')
+vars <- setdiff(names(bc_data), "outcome")
+
+par(mfrow=c(3,5)) 
+for(var in vars[1:15]) {
+  hist(bc_data[[var]], main=var, xlab=var, breaks=20)
+}
+@
+
+<<echo=FALSE, fig=TRUE, width=8, height=6, warning=FALSE>>=
+par(mfrow=c(3,5))
+for(var in vars[16:30]) {
+  hist(bc_data[[var]], main=var, xlab=var, breaks=20)
+}
+@
+
+\begin{center}
+\textbf{Figure 1: Histogram of each predictor}
+\end{center}
+
+\textbf{Figure 2} visualize the median and quartiles of each predictor measurement for the two different outcomes. Overall, it seems that malignant tumors generally show higher values in all features, particularly in the worst and standard error (SE) measurements, although some overlap exists between benign and malignant groups for many features. Notably, features like radius, perimeter, area, and concavity appear to be the most discriminative according to these plots.
+
+<<echo=FALSE, fig=TRUE, width=8, height=6>>=
+par(mfrow=c(3,5))
+for(var in vars[1:15]) {
+  boxplot(bc_data[[var]] ~ bc_data$outcome, main=var, xlab="Outcome", ylab=var, col="green")
+}
+@
+
+<<echo=FALSE, fig=TRUE, width=8, height=6>>=
+par(mfrow=c(3,5))
+for(var in vars[16:30]) {
+  boxplot(bc_data[[var]] ~ bc_data$outcome, main=var, xlab="Outcome", ylab=var, col="green")
+}
+par(mfrow=c(1,1))
+@
+
+\begin{center}
+\textbf{Figure 2: Boxplot of outcome for each predictor}
+\end{center}
+
+
+\subsubsection{Data pre-processing}
+
+First of all, we will transform the outcome from character B and N to factor 0 and 1 in order to fit our models. 
+
+And since the predictors include 3 measurements for each of 10 features, it is possible that there is multicollinearity within the data. For example, there may be some correlation between the measurements for radius and the measurements for perimeter, since perimeter is twice the radius times pi. So we will further examine the data to see the correlation between each pair of variables. We will address the problem of multicollinearity based on the correlation coefficients: If a pair of variables have correlation above 0.8 or below -0.8, we will remove one of the two. Based on \textbf{Figure 3}, we can remove perimeter mean, perimeter worst, perimeter SE, area mean, area worst, area SE, radius worst, concave points mean, concave points worst, texture worst, smoothness worst, concavity mean, concavity worst, concavity SE, and compactness worst. 
+
+<<echo=FALSE>>=
+### Preprocess data
+bc_data$outcome <- ifelse(bc_data$outcome == "B", 0, 1)
+predictors <- bc_data %>% select(-outcome)
+correlation_matrix <- cor(predictors)
+
+findCorrPairs <- function(correlation_matrix, threshold=.8){
+  pairs <- which(abs(correlation_matrix)>=threshold & abs(correlation_matrix)<1, arr.ind = TRUE)
+  pairs <- pairs[!duplicated(t(apply(pairs, 1, sort))),]
+  vars1 <- rownames(correlation_matrix)[pairs[,1]]
+  vars2 <- rownames(correlation_matrix)[pairs[,2]]
+  corrs <- correlation_matrix[pairs]
+  data.frame(Variable1 = vars1, Variable2 = vars2, Correlation = corrs, stringsAsFactors = FALSE)
+}
+
+corrPairs <- findCorrPairs(correlation_matrix)
+corrPairs
+@
+
+\begin{center}
+\textbf{Figure 3: Table of variable pairs with high correlation}
+\end{center}
+
+\subsubsection{Model comparison}
+For each of the regression models, we use 5-fold cross validation to compute its predictive accuracy. After repeating 5 times the process of fitting each model on 4 folds and testing on the remaining fold, we average the obtained accuracies to get their CV estimates. \textbf{Figure 4} shows the average accuracies obtained from this cross validation process for each model. MeanAccuracy1 is the accuracy of the models fitted on the original dataset. MeanAccuracy2 is the accuracy of the models fitted on the dataset after removing highly correlated variables. The highest resulting accuracy is MeanAccuracy1 of SVM, but this model is not quite interpretable. The second highest resulting accuracy is MeanAccuracy2 of Logistic Regression, which is a lot more interpretable as we have removed the highly correlated variables. In conclusion, we will fit a Logistic Regression Model on the dataset after removing highly correlated predictors.
+
+<<echo=FALSE,message=FALSE, results=hide, warning=FALSE>>=
+### Preprocess data
+set.seed(1)
+bc_data$outcome <- as.factor(bc_data$outcome)
+
+### FITTING MODELS ON ORIGINAL DATASET
+fold.size <- floor(nrow(bc_data)/5)
+folds <- seq(1, nrow(bc_data), by=fold.size-1)
+bc_random <- sample(1:nrow(bc_data), nrow(bc_data))
+
+Cpar.grid = gamma.grid = 10^(seq(-2,2,by=1))
+
+logi.accs <- rep(NA, 5)
+rf.accs <- rep(NA, 5)
+svm.accs <- rep(NA, 5)
+for (i in 1:5){
+  test.idx <- seq(from=folds[i], to=folds[i+1])
+  test.idx <- bc_random[test.idx]
+  train.idx <- setdiff(1:nrow(bc_data), test.idx)
+  test <- bc_data[test.idx,]
+  train <- bc_data[train.idx,]
+  
+  # LOGISTIC REGRESSION
+  logi.fit <- glm(outcome ~ ., data=train, family=binomial)
+  logi.prob <- predict(logi.fit, newdata=test, type="response")
+  logi.pred <- ifelse(logi.prob >.5, 1, 0)
+  logi.accs[i] <- mean(logi.pred == test$outcome)
+  
+  # RANDOM FOREST
+  rf.fit <- randomForest(outcome ~., data=train, ntree=500, mtry=3, importance=TRUE)
+  rf.pred <- predict(rf.fit, newdata=test)
+  rf.accs[i] <- mean(rf.pred == test$outcome)
+  
+  # SVM
+  tune.result <- tune.svm(outcome ~ ., data=train, kernel = "radial", cost=Cpar.grid, gamma=gamma.grid)
+  svm.fit <- tune.result$best.model
+  svm.pred <- predict(svm.fit, newdata=test)
+  svm.accs[i] <- mean(svm.pred == test$outcome)
+}
+logi.acc <- mean(logi.accs)
+rf.acc <- mean(rf.accs)
+svm.acc <- mean(svm.accs)
+@
+
+<<echo=FALSE,message=FALSE, results=hide, warning=FALSE>>=
+### FITTING MODELS AFTER REMOVING HIGHLY CORRELATED VARIABLES
+bc_data_1 <- bc_data %>% select(-c(perimeter_mean, perimeter_worst, perimeter_se, area_mean, area_worst, area_se, radius_worst, concave_pts_mean, concave_pts_worst, texture_worst, smoothness_worst, concavity_mean, concavity_worst, concavity_se, compactness_worst))
+
+logi.accs1 <- rep(NA, 5)
+rf.accs1 <- rep(NA, 5)
+svm.accs1 <- rep(NA, 5)
+for (i in 1:5){
+  test.idx <- seq(from=folds[i], to=folds[i+1])
+  test.idx <- bc_random[test.idx]
+  train.idx <- setdiff(1:nrow(bc_data), test.idx)
+  test <- bc_data_1[test.idx,]
+  train <- bc_data_1[train.idx,]
+  
+  # LOGISTIC REGRESSION
+  logi.fit <- glm(outcome ~ ., data=train, family=binomial)
+  logi.prob <- predict(logi.fit, newdata=test, type="response")
+  logi.pred <- ifelse(logi.prob >.5, 1, 0)
+  logi.accs1[i] <- mean(logi.pred == test$outcome)
+  
+  # RANDOM FOREST
+  rf.fit <- randomForest(outcome ~., data=train, ntree=500, mtry=3, importance=TRUE)
+  rf.pred <- predict(rf.fit, newdata=test)
+  rf.accs1[i] <- mean(rf.pred == test$outcome)
+  
+  # SVM
+  tune.result <- tune.svm(outcome ~ ., data=train, kernel = "radial", cost=Cpar.grid, gamma=gamma.grid)
+  svm.fit <- tune.result$best.model
+  svm.pred <- predict(svm.fit, newdata=test)
+  svm.accs1[i] <- mean(svm.pred == test$outcome)
+}
+logi.acc1 <- mean(logi.accs1)
+rf.acc1 <- mean(rf.accs1)
+svm.acc1 <- mean(svm.accs1)
+@
+
+<<echo=FALSE>>=
+cv.table <- data.frame(
+  Model = c("Logistic Regression","Random Forest", "SVM"),
+  MeanAccuracy1 = c(logi.acc, rf.acc, svm.acc),
+  MeanAccuracy2 = c(logi.acc1, rf.acc1, svm.acc1)
+)
+cv.table
+@
+\begin{center}
+\textbf{Figure 4: Table of fitted model accuracies}
+\end{center}
+
+\subsubsection{Final model: Logistic Regression}
+<<echo=FALSE>>=
+### FINAL LOGISTIC MODEL
+bc_test <- read.csv('brca_test.csv')
+bc_test$outcome <- ifelse(bc_test$outcome == "B", 0, 1)
+
+bc_test_1 <- bc_test %>% select(-c(perimeter_mean, perimeter_worst, perimeter_se, area_mean, area_worst, area_se, radius_worst, concave_pts_mean, concave_pts_worst, texture_worst, smoothness_worst, concavity_mean, concavity_worst, concavity_se, compactness_worst))
+
+logi.fit <- glm(outcome ~ ., data=bc_data_1, family=binomial)
+logi.prob <- predict(logi.fit, newdata=bc_test_1, type="response")
+logi.pred <- ifelse(logi.prob >.5, 1, 0)
+@
+
+The confusion matrix in \textbf{Figure 5} displays the performance of our classification model in predicting whether a tumor is benign (B) or malignant (M). There are 58 true positives (TP), 106 true negative (TN), 6 false postives (FP), and 1 false negatives (FN). We can use these measurements to evaluate the performance of our model
+$$
+  Accuracy = \frac{TP+TN}{Total} = \frac{58+106}{171}= .959
+$$
+$$
+  Precision_B = \frac{TN}{TN+FN} = \frac{106}{106+6} = .946
+$$
+$$
+  Precision_M = \frac{TP}{TP+FP} = \frac{58}{58+1} = .983
+$$
+$$
+  Recall_B = \frac{TN}{TN+FP} =\frac{106}{106+1} = .99
+$$
+$$
+  Recall_M = \frac{TP}{TP+FN}=\frac{58}{58+6} = .906
+$$
+$$
+  F1_B = 2.\frac{Precision_B.Recall_B}{Precision_B+Recall_B}=2.\frac{.946+.99}{.946+.99}=.967
+$$
+$$
+  F1_M = 2.\frac{Precision_M.Recall_M}{Precision_M+Recall_M}=2.\frac{.983+.906}{.983+.906}=.943
+$$
+Overall, the model achieve relatively high accuracy (.959) and precision for both classes, indicating that it is generally reliable. However, recall for the benign class is very high (.99), while it is slightly lower for the malignant class at .906.
+
+<<echo=FALSE>>=
+### CONFUSION MATRIX 
+prob <- predict(logi.fit, bc_test_1, type = "response")
+pred <- ifelse(prob > .5, "N", "B")
+reference <- ifelse(bc_test$outcome == 0, "B", "N")
+cm <- confusionMatrix(as.factor(pred), as.factor(reference))
+cm$table
+@
+\begin{center}
+\textbf{Figure 5: Confusion Matrix}
+\end{center}
+
+The ROC curve in \textbf{Figure 6} bends towards the top-left corner of the plot, indicating strong classification performance. The curve's upwrd trajectory suggests that the model achieves high sensitivity (true positive rate) while maintaining high specificity (low false positive rate). The AUC is .989, indicating the the model has high discriminatory ability. Overall, the ROC curve and the associated AUC score suggest that our logistic regression model is highly effective at distinguishing between benign and malignant tumors.
+
+<<echo=FALSE, fig=TRUE>>=
+### ROC CURVE
+roc.curve <- roc(bc_test_1$outcome, logi.prob)
+plot(roc.curve, main="Figure 6: ROC Curve for Logistic Regression Model", print.auc=TRUE)
+@
+
+The table in \textbf{Figure 7} displays the estimated coefficients, standard errors, z-values, and p-values for the predictors in our logistic regression model. Based on the p-values, significant predictors include radius\_mean, texture\_mean, radius\_se, smoothness\_se, fractal\_dim\_se, symmetry\_worst, and fractal\_dim\_worst. These predictors have a substantial impact on the likelihood of a tumor being malignant (the positive coefficients indicate a higher likelihood of malignancy, while negative coefficients suggest a lower likelihood). Meanwhile, smoothness\_mean, compactness\_mean, symmetry\_mean, fractal\_dim\_mean, texture\_se, compactness\_se, concave\_pts\_se, and symmetry\_se do not significantly contribute to the model. 
+
+<<echo=FALSE>>=
+### Coefficient table
+coef.df <- as.data.frame(coef(summary(logi.fit)))
+coef.df <- coef.df[-1, ]  # Remove intercept
+coef.df
+@
+\begin{center}
+\textbf{Figure 7: Table of predictors and coefficients}
+\end{center}
+
+\textbf{Figure 8} shows the bar plot of coefficient estimate, the left side includes all the predictor variables in our mode, and the right side includes only the predictors that are indicated significant by p-values less than .05. The plot visually highlights the most important predictors affecting the classification of breast tumors.Statisically significant predictors include smoothness\_se, fractal\_dim\_worst, symmetry\_worst, radius\_se, radius\_mean, texture\_mean, and fractal\_dim\_se. Among these, the predictors with the most substantial impact include fractal\_dim\_se, smoothness\_se, fractal\_dim\_worst, symmetry\_worst, and radius\_se. Features like fractal\_dim\_se and fractal\_dim\_worst suggest the importance of fractal dimension in differentiating between benign and malignant tumors.
+
+<<echo=FALSE, fig=TRUE>>=
+coef.df <- coef.df %>% mutate(Variable = rownames(coef.df))
+p1 <- ggplot(coef.df, aes(x=reorder(Variable, Estimate), y=Estimate))+
+  geom_bar(stat="identity", fill="#2c7fb8")+
+  coord_flip() +
+  labs(x="Predictor variable",
+       y="Coefficient Estimate")
+
+coef.df2 <- coef.df %>% filter(`Pr(>|z|)` < 0.05)
+p2 <- ggplot(coef.df2, aes(x=reorder(Variable, Estimate), y=Estimate))+
+  geom_bar(stat="identity", fill="#2c7fb8")+
+  coord_flip() +
+  labs(x="Predictor variable",
+       y="Coefficient Estimate")
+
+grid.arrange(p1, p2, ncol=2)
+@
+\begin{center}
+\textbf{Figure 8: Barplot of coefficient estimates}
+\end{center}
+
+\section{Discussion}
+
+\subsubsection*{Recap}
+
+The final model we use to predict whether a tumor is benign or malignant is a Logistic Regression model fitted on the dataset with highly correlated variables removed. The model is chosen after comparing with Random Forest and Support Vector Machine for its predictive accuracy. The predictive accuracy in the test set (brca\_test.csv) is .959
+
+Significant predictors (indicated by less than .05 p-values) include smoothness\_se, fractal\_dim\_worst, symmetry\_worst, radius\_se, radius\_mean, texture\_mean, and fractal\_dim\_se. All these predictors have positive coefficients, except for fractal\_dim\_se, meaning that higher values of most of these predictors indicate a higher likelihood of a tumor being malignant.On the other hand, the only negative coefficient predictor frac\_dim\_se is also the most signifcant predictor, with the absolute value of its coefficient being 2479.0458438.
+
+\subsubsection*{Meaningful Insights}
+The logistic regression model identifies several statistically significant predictors that are crucial in predicting whether a tumor is malignant or benign, including smoothness\_se, fractal\_dim\_worst, symmetry\_worst, radius\_se, radius\_mean, texture\_mean, and fractal\_dim\_se. Among these, predictors with the most substantial impact include fractal\_dim\_se, smoothness\_se, fractal\_dim\_worst, symmetry\_worst, and radius\_se.
+
+Fractal Dimension SE has the strongest negative coefficient of approximately -2479.5, implying that a decrease in the standard error of the fractal dimension increases the likelihood of a tumor being malignant significantly. This suggest the lower standard errors, which indicate consistent complexity of the tumor border, may be more characteristic of malignant tumors. 
+
+Smoothness SE has a strong positive coefficient of approximately 948.5, suggesting that higher standard errors of smoothness, indicating less uniform surfaces, increase the likelihood of malignancy. Fractal Dimension Worst also has a strong positive coefficient of approximately 259.5, suggesting that an increase in the worst fractal dimension value is associated with a higher probability of malignancy. Symmetry Worst and Radius SE also have relatively strong positive coefficients, suggesting that increased worst symmetry values and higher standard errors of the radius are linked to increased likelihood of malignancy. This may suggest that asymmetrical patterns and greater variability in tumor radius are quite characteristic of malignant tumors. 
+
+Additionally, Radius Mean and Texture Mean are also consider significant predictors, though their coefficients are not as strong, at 2.35 and 0.54 respectively. This suggest that higher mean radius values and higher mean texture values increase the likelihood of malignancy, though not substantially 
+
+Overall, the results highlight that fractal dimension metrics (SE and worst), smoothness SE, symmetry worst, and radius SE have substantial impacts on predicting malignancy. These features describe the complexity, irregularity and growth patterns of tumors, proving valuable insights for oncologists to diagnose breast cancer. 
+
+\subsubsection*{Model Limitations}
+
+The most significant limitation of our model is the manual data pre-processing. Before fitting our logistic regression model, we have removed the highly correlated models. This process was done manually by examining the table of variables with high correlations and deciding which variables should be omitted. The decision of whether or not to keep a variable might not be completely accurate, as it was done manually. If so, this could result in missing important information in our final model and thus missing meaningful insights that could help inform oncologists. 
+
+\subsubsection*{Future Work}
+
+Future work could consider other methods of deciding which predictors should be included in the final classification model using other methods such as Principal Component Analysis (PCA), which involves a lot less manual decision-making than the process we employed in this paper. However, we have also tried PCA, and the model with the highest average accuracy after cross-validation, Support Vector Machine (SVM), performed at a similar accuracy to our current model in predicting malignant tumors in the test set. One downside of PCA, however, is that principal components are not directly interpretable and need to be traced back to the original variables in the dataset. 
+
+\section{Reference}
+\begin{enumerate}
+  \item (Textbook) An Introduction To Statistical Learning (with Applications in R)
+  \item (Lecture Slides) Lecture 11, Lecture 18, Lecture 20
+\end{enumerate}
+\clearpage
+
+\section*{Appendix. R Code}
+<<>>=
+library(tidyverse)
+library(caret)
+library(e1071)
+library(randomForest)
+
+set.seed(1)
+bc_data <- read.csv('brca_train.csv')
+bc_data$outcome <- ifelse(bc_data$outcome == "B", 0, 1)
+bc_data$outcome <- as.factor(bc_data$outcome)
+
+bc_test <- read.csv('brca_test.csv')
+bc_test$outcome <- ifelse(bc_test$outcome == "B", 0, 1)
+bc_test$outcome <- as.factor(bc_test$outcome)
+@
+
+<<>>=
+### FITTING MODELS ON ORIGINAL DATASET
+fold.size <- floor(nrow(bc_data)/5)
+folds <- seq(1, nrow(bc_data), by=fold.size-1)
+bc_random <- sample(1:nrow(bc_data), nrow(bc_data))
+
+Cpar.grid = gamma.grid = 10^(seq(-2,2,by=1))
+
+logi.accs <- rep(NA, 5)
+rf.accs <- rep(NA, 5)
+svm.accs <- rep(NA, 5)
+
+for (i in 1:5){
+  test.idx <- seq(from=folds[i], to=folds[i+1])
+  test.idx <- bc_random[test.idx]
+  train.idx <- setdiff(1:nrow(bc_data), test.idx)
+  test <- bc_data[test.idx,]
+  train <- bc_data[train.idx,]
+  
+  # LOGISTIC REGRESSION
+  logi.fit <- glm(outcome ~ ., data=train, family=binomial)
+  logi.prob <- predict(logi.fit, newdata=test, type="response")
+  logi.pred <- ifelse(logi.prob >.5, 1, 0)
+  logi.accs[i] <- mean(logi.pred == test$outcome)
+  
+  # RANDOM FOREST
+  rf.fit <- randomForest(outcome ~., data=train, ntree=500, mtry=3, importance=TRUE)
+  rf.pred <- predict(rf.fit, newdata=test)
+  rf.accs[i] <- mean(rf.pred == test$outcome)
+  
+  # SVM
+  tune.result <- tune.svm(outcome ~ ., data=train, kernel = "radial", cost=Cpar.grid, gamma=gamma.grid)
+  svm.fit <- tune.result$best.model
+  svm.pred <- predict(svm.fit, newdata=test)
+  svm.accs[i] <- mean(svm.pred == test$outcome)
+}
+logi.acc <- mean(logi.accs)
+rf.acc <- mean(rf.accs)
+svm.acc <- mean(svm.accs)
+@
+
+<<>>=
+### FITTING MODELS AFTER REMOVING HIGHLY CORRELATED VARIABLES
+bc_data_1 <- bc_data %>% select(-c(perimeter_mean, perimeter_worst, perimeter_se, area_mean, area_worst, area_se, radius_worst, concave_pts_mean, concave_pts_worst, texture_worst, smoothness_worst, concavity_mean, concavity_worst, concavity_se, compactness_worst))
+
+logi.accs1 <- rep(NA, 5)
+rf.accs1 <- rep(NA, 5)
+svm.accs1 <- rep(NA, 5)
+for (i in 1:5){
+  test.idx <- seq(from=folds[i], to=folds[i+1])
+  test.idx <- bc_random[test.idx]
+  train.idx <- setdiff(1:nrow(bc_data), test.idx)
+  test <- bc_data_1[test.idx,]
+  train <- bc_data_1[train.idx,]
+  
+  # LOGISTIC REGRESSION
+  logi.fit <- glm(outcome ~ ., data=train, family=binomial)
+  logi.prob <- predict(logi.fit, newdata=test, type="response")
+  logi.pred <- ifelse(logi.prob >.5, 1, 0)
+  logi.accs[i] <- mean(logi.pred == test$outcome)
+  
+  # RANDOM FOREST
+  rf.fit <- randomForest(outcome ~., data=train, ntree=500, mtry=3, importance=TRUE)
+  rf.pred <- predict(rf.fit, newdata=test)
+  rf.accs[i] <- mean(rf.pred == test$outcome)
+  
+  # SVM
+  tune.result <- tune.svm(outcome ~ ., data=train, kernel = "radial", cost=Cpar.grid, gamma=gamma.grid)
+  svm.fit <- tune.result$best.model
+  svm.pred <- predict(svm.fit, newdata=test)
+  svm.accs[i] <- mean(svm.pred == test$outcome)
+}
+logi.acc1 <- mean(logi.accs1)
+rf.acc1 <- mean(rf.accs1)
+svm.acc1 <- mean(svm.accs1)
+@
+
+<<>>=
+### LOGISCTIC REGRESSION AFTER REMOVING CORRELATED VARS
+bc_test_1 <- bc_test %>% select(-c(perimeter_mean, perimeter_worst, perimeter_se, area_mean, area_worst, area_se, radius_worst, concave_pts_mean, concave_pts_worst, texture_worst, smoothness_worst, concavity_mean, concavity_worst, concavity_se, compactness_worst))
+
+logi.fit <- glm(outcome ~ ., data=bc_data_1, family=binomial)
+logi.prob <- predict(logi.fit, newdata=bc_test_1, type="response")
+logi.pred <- ifelse(logi.prob >.5, 1, 0)
+logi.acc <- mean(logi.pred == bc_test_1$outcome)
+logi.acc
+logi.predictions <- ifelse(logi.pred ==0, "B", "M")
+logi.predictions
+cat("The prediction accuracy of our final model is: ", logi.acc)
+@
+
+
+\end{document}
