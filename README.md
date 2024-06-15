@@ -1,4 +1,4 @@
-# BreastCancer-PredictModel
+# **Predictive Model for Malignant Breast Cancer**
 
 Our primary objective is to build a classication model that accurately predicts the outcome (be-
 nign/malignant) using brca_train and apply the final model to brca_test to classify the remaining 171 observations and report our test accuracy. Our secondary objective is to identify signicant pre-
