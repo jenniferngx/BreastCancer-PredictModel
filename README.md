@@ -1,5 +1,4 @@
-## 🩺 Malignant Breast Cancer Prediction Model
-Using Machine Learning to Classify Benign and Malignant Breast Cancer Cases
+## 🩺 Malignant Breast Cancer Prediction Model: Using Machine Learning to Classify Benign and Malignant Breast Cancer Cases
 ---
 ## 🚀 **Project Overview**  
 This project builds a **predictive classification model** using **R** to identify whether breast cancer tumors are **benign** or **malignant**. By leveraging multiple machine learning algorithms, this analysis explores performance metrics to determine the most accurate and reliable model for medical diagnosis.
