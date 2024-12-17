@@ -1,13 +1,12 @@
 ## 🩺 **Malignant Breast Cancer Prediction Model**
 Using Machine Learning to Classify Benign and Malignant Breast Cancer Cases
 
----
 ## 🚀 **Project Overview**  
 This project builds a **predictive classification model** using **R** to identify whether breast cancer tumors are **benign** or **malignant**. By leveraging multiple machine learning algorithms, this analysis explores performance metrics to determine the most accurate and reliable model for medical diagnosis.
 
 The full report contains the end-to-end process: from data preprocessing and exploration to model building, evaluation, and insights.
 
----
+Read my [full paper](https://drive.google.com/file/d/1tUAjJn_6ZYH8GinAMr3lNKdx_RlYK2q-/view).
 
 ## 🔍 **Key Objectives**  
 1. Preprocess and analyze breast cancer datasets for model input.  
@@ -18,12 +17,10 @@ The full report contains the end-to-end process: from data preprocessing and exp
 3. Evaluate model performance using key metrics like accuracy, precision, recall, and F1-score.  
 4. Identify the most significant predictors of malignant breast cancer cases.  
 
----
 ## 🛠️ **Tools & Technologies**  
 - **Programming Language**: R  
 - **Libraries**: `caret`, `randomForest`, `e1071`, `gbm`, `ggplot2`, `dplyr`  
 
---- 
 ## 🧩 **Methodology**  
 
 1. **Data Preprocessing**  
@@ -48,7 +45,6 @@ The full report contains the end-to-end process: from data preprocessing and exp
    - **Recall**  
    - **F1-Score**  
    - **ROC-AUC Curve**
----
 
 ## 📊 **Results**  
 
@@ -58,10 +54,7 @@ The full report contains the end-to-end process: from data preprocessing and exp
 | Random Forest            | 94.68354%    | 94.93671%              |
 | Support Vector Machine   | 97.72152%    | 94.93671%              |
 
-
 **Best Performing Model**: **Logistic Regression** is chosen for its balance of accuracy and interpretability, with 96.2% accuracy.
-
----
 
 ## 🔑 **Key Insights**  
 - **Model Performance**: Logistic Regression was the top-performing model that balances accuracy and interpretability, with 96.2% accuracy.  
@@ -69,4 +62,3 @@ The full report contains the end-to-end process: from data preprocessing and exp
 - **Clinical Relevance**: These features provide valuable insights into the complexity, irregularity, and growth variability of tumors, offering support for oncologists in diagnosing breast cancer.
 
 
-Read my [full paper](https://drive.google.com/file/d/1tUAjJn_6ZYH8GinAMr3lNKdx_RlYK2q-/view).
